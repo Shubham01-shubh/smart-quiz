@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from .views import signup
+from .views import import_quiz_view
 
 urlpatterns = [
     path('', views.home, name='home'),
@@ -12,4 +13,5 @@ urlpatterns = [
     path('history/', views.history, name='history'),
     path('attempt/<int:attempt_id>/', views.attempt_detail, name='attempt_detail'),
     path('signup/', signup, name='signup'),
+     path("quiz/import/", import_quiz_view, name="quiz_import"),
 ]

@@ -4,6 +4,7 @@ from django.urls import path, include
 from django.shortcuts import redirect
 from django.contrib.auth.views import LoginView
 
+
 # Custom login to hide the navbar on the login page
 class SQLogin(LoginView):
     extra_context = {'hide_navbar': True}
@@ -26,4 +27,6 @@ urlpatterns = [
 
     # Root -> home
     path('', lambda r: redirect('home')),
+
+ 
 ]

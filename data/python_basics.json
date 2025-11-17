@@ -1,0 +1,30 @@
+﻿{
+  "title": "Python Basics",
+  "description": "Intro quiz on core Python concepts.",
+  "time_limit_minutes": 10,
+  "tags": ["python","intro"],
+  "questions": [
+    {
+      "text": "What is the output of print(type([]))?",
+      "explanation": "Lists are built-in, mutable sequences.",
+      "difficulty": "easy",
+      "options": [
+        {"text": "<class 'list'>", "is_correct": true},
+        {"text": "<class 'tuple'>", "is_correct": false},
+        {"text": "<class 'dict'>", "is_correct": false},
+        {"text": "<class 'set'>", "is_correct": false}
+      ]
+    },
+    {
+      "text": "Which keyword defines a function in Python?",
+      "explanation": "Functions are declared with def.",
+      "difficulty": "easy",
+      "options": [
+        {"text": "func", "is_correct": false},
+        {"text": "def", "is_correct": true},
+        {"text": "function", "is_correct": false},
+        {"text": "fn", "is_correct": false}
+      ]
+    }
+  ]
+}

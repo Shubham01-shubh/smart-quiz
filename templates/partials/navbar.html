@@ -7,7 +7,9 @@
     box-shadow: 0 8px 20px rgba(28, 67, 130, .18);
   }
   .sq-brand { letter-spacing: .3px; }
-  .navbar-dark .navbar-toggler-icon { filter: invert(1) grayscale(100%) brightness(2); }
+  .navbar-dark .navbar-toggler-icon {
+    filter: invert(1) grayscale(100%) brightness(2);
+  }
 </style>
 
 <nav class="navbar navbar-expand-lg navbar-dark sq-glass">
@@ -16,38 +18,61 @@
       <i class="bi bi-lightning-charge-fill me-1"></i>Smart Quiz
     </a>
 
-    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#sqNav" aria-controls="sqNav" aria-expanded="false" aria-label="Toggle navigation">
+    <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse"
+            data-bs-target="#sqNav" aria-controls="sqNav" aria-expanded="false"
+            aria-label="Toggle navigation">
       <span class="navbar-toggler-icon"></span>
     </button>
 
     <div class="collapse navbar-collapse" id="sqNav">
 
-      <!-- LEFT: role-aware links -->
+      <!-- LEFT SIDE LINKS -->
       <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+
         <li class="nav-item">
-          <a class="nav-link" href="{% url 'home' %}"><i class="bi bi-house-door me-1"></i>Home</a>
+          <a class="nav-link" href="{% url 'home' %}">
+            <i class="bi bi-house-door me-1"></i>Home
+          </a>
         </li>
 
         {% if user.is_staff %}
           <li class="nav-item">
-            <a class="nav-link" href="/admin/"><i class="bi bi-gear me-1"></i>Admin</a>
+            <a class="nav-link" href="/admin/">
+              <i class="bi bi-gear me-1"></i>Admin
+            </a>
           </li>
+
+          <!-- IMPORT QUIZ LINK (STAFF ONLY) -->
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'quiz_import' %}">
+              <i class="bi bi-upload me-1"></i>Import Quiz
+            </a>
+          </li>
+
         {% else %}
           <li class="nav-item">
-            <a class="nav-link" href="{% url 'quiz_select' %}"><i class="bi bi-ui-checks-grid me-1"></i>Select Quiz</a>
+            <a class="nav-link" href="{% url 'quiz_select' %}">
+              <i class="bi bi-ui-checks-grid me-1"></i>Select Quiz
+            </a>
           </li>
+
           <li class="nav-item">
-            <a class="nav-link" href="{% url 'history' %}"><i class="bi bi-clock-history me-1"></i>History</a>
+            <a class="nav-link" href="{% url 'history' %}">
+              <i class="bi bi-clock-history me-1"></i>History
+            </a>
           </li>
         {% endif %}
       </ul>
 
-      <!-- RIGHT: auth controls -->
+      <!-- RIGHT SIDE: LOGIN / LOGOUT -->
       <ul class="navbar-nav ms-auto">
         {% if user.is_authenticated %}
           <li class="nav-item">
-            <span class="navbar-text me-2"><i class="bi bi-person-circle me-1"></i>{{ user.username }}</span>
+            <span class="navbar-text me-2">
+              <i class="bi bi-person-circle me-1"></i>{{ user.username }}
+            </span>
           </li>
+
           <li class="nav-item">
             <form action="{% url 'logout' %}" method="post" class="d-inline">
               {% csrf_token %}
@@ -56,6 +81,7 @@
               </button>
             </form>
           </li>
+
         {% else %}
           <li class="nav-item">
             <a class="btn btn-sm btn-light" href="{% url 'login' %}">
