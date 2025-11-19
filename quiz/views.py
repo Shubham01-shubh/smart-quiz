@@ -8,12 +8,41 @@ from django.contrib.auth import login
 from django.http import HttpResponseForbidden, HttpResponseBadRequest
 from django.db import transaction
 from django.contrib import messages
-
+from django.db.models import Count
+from django.http import HttpResponse
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import landscape, A4
+from reportlab.lib import colors
+from reportlab.lib.units import inch
 
 @login_required
 def home(request):
+    # 1. Get the latest attempt for the "Latest Attempt" alert (existing logic)
     latest_attempt = QuizAttempt.objects.filter(user=request.user).order_by('-date_completed').first()
-    return render(request, 'quiz/home.html', {'latest_attempt': latest_attempt})
+    
+    # 2. NEW: Get last 5 attempts for the graph (oldest to newest for the graph flow)
+    recent_attempts = QuizAttempt.objects.filter(user=request.user).order_by('-date_completed')[:5]
+    # We reverse it in Python so the graph goes Left(Old) -> Right(New)
+    recent_attempts = reversed(list(recent_attempts))
+    
+    # 3. Prepare data lists for Chart.js
+    dates = []
+    scores = []
+    quiz_titles = []
+    
+    for attempt in recent_attempts:
+        # Format date as "Nov 19"
+        dates.append(attempt.date_completed.strftime("%b %d"))
+        scores.append(attempt.score)
+        quiz_titles.append(attempt.quiz.title)
+
+    context = {
+        'latest_attempt': latest_attempt,
+        'dates': dates,         # Sending these to template
+        'scores': scores,       # Sending these to template
+        'quiz_titles': quiz_titles,
+    }
+    return render(request, 'quiz/home.html', context)
 
 
 def leaderboard(request, quiz_id):
@@ -23,13 +52,35 @@ def leaderboard(request, quiz_id):
 
 @login_required
 def history(request):
+    # Initialize empty lists for the chart
+    chart_usernames = []
+    chart_counts = []
+
     if request.user.is_staff:
-        # If user is admin/staff, show all attempts
-        attempts = QuizAttempt.objects.all().order_by('-date_completed')
+        # 1. Get all attempts for the table
+        attempts = QuizAttempt.objects.all().select_related('user', 'quiz').order_by('-date_completed')
+        
+        # 2. NEW: Calculate "Who attempted the most quizzes?"
+        # This groups by username, counts the IDs, and orders by biggest count
+        user_stats = QuizAttempt.objects.values('user__username') \
+            .annotate(total_attempts=Count('id')) \
+            .order_by('-total_attempts')[:10] # Top 10 only
+        
+        # 3. Prepare data for Chart.js
+        for stat in user_stats:
+            chart_usernames.append(stat['user__username'])
+            chart_counts.append(stat['total_attempts'])
+            
     else:
-        # Otherwise, show only their own attempts
-        attempts = QuizAttempt.objects.filter(user=request.user).order_by('-date_completed')
-    return render(request, 'quiz/history.html', {'attempts': attempts})
+        # Standard student view (no changes needed here)
+        attempts = QuizAttempt.objects.filter(user=request.user).select_related('quiz').order_by('-date_completed')
+
+    context = {
+        'attempts': attempts,
+        'chart_usernames': chart_usernames, # Sending to template
+        'chart_counts': chart_counts,       # Sending to template
+    }
+    return render(request, 'quiz/history.html', context)
 
 
 @login_required
@@ -244,3 +295,112 @@ def import_quiz_view(request):
 
     messages.success(request, f"Imported quiz: {title}")
     return redirect("quiz_select")
+
+@login_required
+def download_certificate(request, attempt_id):
+    attempt = get_object_or_404(QuizAttempt, id=attempt_id, user=request.user)
+
+    if attempt.score <= 0:
+        return HttpResponse("Score too low for certificate.", status=400)
+
+    # Create the HttpResponse object with the appropriate PDF headers.
+    response = HttpResponse(content_type='application/pdf')
+    filename = f"Certificate_{attempt.user.username}.pdf"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    # Create the PDF object, using the response object as its "file."
+    p = canvas.Canvas(response, pagesize=landscape(A4))
+    
+    # --- SETUP VARIABLES ---
+    width, height = landscape(A4)
+    center_x = width / 2.0
+    
+    # --- 1. BACKGROUND & BORDER ---
+    # Light Cream Background
+    p.setFillColorRGB(0.98, 0.97, 0.95) 
+    p.rect(0, 0, width, height, fill=1, stroke=0)
+    
+    # Fancy Double Border (Navy Blue)
+    p.setStrokeColorRGB(0.13, 0.31, 0.63) # #2050a0
+    p.setLineWidth(5)
+    p.rect(30, 30, width-60, height-60) # Outer Thick
+    
+    p.setLineWidth(1)
+    p.rect(38, 38, width-76, height-76) # Inner Thin
+
+    # Corner Accents (Gold squares)
+    p.setFillColorRGB(0.83, 0.69, 0.22) # Gold
+    p.rect(30, 30, 10, 10, fill=1, stroke=0) # Bottom Left
+    p.rect(width-40, 30, 10, 10, fill=1, stroke=0) # Bottom Right
+    p.rect(30, height-40, 10, 10, fill=1, stroke=0) # Top Left
+    p.rect(width-40, height-40, 10, 10, fill=1, stroke=0) # Top Right
+
+    # --- 2. HEADER TEXT ---
+    # Helper function to center text
+    def draw_centered_text(text, y, font, size, color=colors.black):
+        p.setFont(font, size)
+        p.setFillColor(color)
+        text_width = p.stringWidth(text, font, size)
+        p.drawString(center_x - (text_width / 2.0), y, text)
+
+    draw_centered_text("CERTIFICATE", height - 140, "Helvetica-Bold", 48, colors.HexColor('#2050a0'))
+    draw_centered_text("OF ACHIEVEMENT", height - 170, "Helvetica", 14, colors.gray)
+    
+    draw_centered_text("This certificate is proudly presented to", height - 230, "Helvetica-Oblique", 14, colors.darkgrey)
+
+    # --- 3. STUDENT NAME (Big & Classy) ---
+    name = attempt.user.username
+    draw_centered_text(name, height - 290, "Times-BoldItalic", 50, colors.black)
+    
+    # Underline for name
+    p.setLineWidth(1)
+    p.setStrokeColor(colors.black)
+    p.line(center_x - 150, height - 300, center_x + 150, height - 300)
+
+    # --- 4. DETAILS ---
+    quiz_name = attempt.quiz.title
+    draw_centered_text(f"For successfully completing the assessment", height - 340, "Helvetica", 14, colors.darkgrey)
+    draw_centered_text(quiz_name, height - 370, "Helvetica-Bold", 22, colors.HexColor('#148cb4'))
+    
+    draw_centered_text(f"Score Achieved: {attempt.score}", height - 400, "Helvetica", 12, colors.black)
+
+    # --- 5. THE BADGE (Programmatic Drawing) ---
+    # We draw a Gold Seal visually using circles and a star shape logic
+    p.saveState()
+    p.translate(width - 100, 100) # Move to bottom right corner
+    p.setFillColorRGB(0.83, 0.69, 0.22) # Gold
+    p.setStrokeColor(colors.white)
+    p.setLineWidth(3)
+    
+    # Draw the seal circle
+    p.circle(0, 0, 40, fill=1, stroke=1)
+    p.setLineWidth(1)
+    p.circle(0, 0, 32, fill=0, stroke=1) # Inner ring
+    
+    # Text inside seal
+    p.setFont("Helvetica-Bold", 8)
+    p.setFillColor(colors.white)
+    p.drawCentredString(0, 10, "VERIFIED")
+    p.drawCentredString(0, -2, "SUCCESS")
+    p.drawCentredString(0, -14, "2025")
+    p.restoreState()
+
+    # --- 6. SIGNATURES & DATE ---
+    date_str = attempt.date_completed.strftime("%B %d, %Y")
+    
+    # Date (Bottom Left)
+    p.setFont("Helvetica", 10)
+    p.setFillColor(colors.black)
+    p.drawString(100, 100, f"Date: {date_str}")
+    p.line(100, 95, 250, 95) # Line
+
+    # Signature (Bottom Center)
+    p.drawString(center_x - 50, 100, "Smart Quiz Admin")
+    p.line(center_x - 50, 95, center_x + 100, 95)
+    p.setFont("Helvetica-Oblique", 8)
+    p.drawString(center_x - 50, 80, "(Authorized Signature)")
+
+    # Close the PDF object cleanly, and we're done.
+    p.showPage()
+    p.save()
+    return response

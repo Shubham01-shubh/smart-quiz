@@ -30,29 +30,12 @@
       animation: fadeInUp .55s ease both;
     }
     .table{ margin: 0; }
-    thead.table-light th{
-      color:#2e467c;
-    }
-    .table-hover tbody tr{
-      transition: background-color .25s ease, transform .15s ease;
-    }
-    .table-hover tbody tr:hover{
-      background: #f7fbff;
-      transform: translateY(-1px);
-    }
-    .sq-title{
-      color: var(--sq-primary);
-      font-weight: 800;
-      letter-spacing: .2px;
-    }
-    .sq-chip{
-      display:inline-block; padding:6px 10px; border-radius:999px;
-      background:#eef5ff; color: var(--sq-primary); font-size:.85rem;
-    }
-    @keyframes fadeInUp{
-      from{ opacity:0; transform: translateY(10px); }
-      to{ opacity:1; transform: translateY(0); }
-    }
+    thead.table-light th{ color:#2e467c; }
+    .table-hover tbody tr{ transition: background-color .25s ease, transform .15s ease; }
+    .table-hover tbody tr:hover{ background: #f7fbff; transform: translateY(-1px); }
+    .sq-title{ color: var(--sq-primary); font-weight: 800; letter-spacing: .2px; }
+    .sq-chip{ display:inline-block; padding:6px 10px; border-radius:999px; background:#eef5ff; color: var(--sq-primary); font-size:.85rem; }
+    @keyframes fadeInUp{ from{ opacity:0; transform: translateY(10px); } to{ opacity:1; transform: translateY(0); } }
   </style>
 </head>
 <body>
@@ -74,9 +57,22 @@
   </div>
 
   <div class="sq-section">
+
+    {% if request.user.is_staff and chart_usernames %}
+    <div class="sq-card mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="mb-0 text-primary fw-bold"><i class="bi bi-bar-chart-fill me-2"></i>Most Active Students</h5>
+            <span class="badge bg-light text-primary border">Top 10</span>
+        </div>
+        <div style="height: 250px;">
+            <canvas id="adminChart"></canvas>
+        </div>
+    </div>
+    {% endif %}
+
     <div class="sq-card">
       <div class="d-flex justify-content-between align-items-center mb-2">
-        <h2 class="sq-title h4 mb-0"><i class="bi bi-journal-text me-2"></i>Attempts</h2>
+        <h2 class="sq-title h4 mb-0"><i class="bi bi-journal-text me-2"></i>Attempts Log</h2>
       </div>
 
       <div class="table-responsive">
@@ -98,7 +94,7 @@
             <tr>
               <td class="fw-semibold">{{ forloop.counter }}</td>
               {% if request.user.is_staff %}
-                <td>{{ attempt.user.username }}</td>
+                <td class="fw-bold text-primary">{{ attempt.user.username }}</td>
               {% endif %}
               <td>{{ attempt.quiz.title }}</td>
               <td>
@@ -106,7 +102,7 @@
                   <i class="bi bi-star-fill me-1 text-warning"></i>{{ attempt.score }}
                 </span>
               </td>
-              <td class="text-muted">{{ attempt.date_completed|date:"M d, Y H:i" }}</td>
+              <td class="text-muted">{{ attempt.date_completed|date:"M d, H:i" }}</td>
               <td class="text-end">
                 <a href="{% url 'attempt_detail' attempt.id %}" class="btn btn-sm btn-outline-primary">
                   <i class="bi bi-eye me-1"></i>View
@@ -116,7 +112,7 @@
             {% empty %}
             <tr>
               <td colspan="{% if request.user.is_staff %}6{% else %}5{% endif %}" class="text-secondary text-center py-4">
-                <i class="bi bi-inboxes me-1"></i>You haven't completed any quizzes yet.
+                <i class="bi bi-inboxes me-1"></i>No data found.
               </td>
             </tr>
             {% endfor %}
@@ -132,6 +128,59 @@
     </div>
   </div>
 
+  {{ chart_usernames|json_script:"users-data" }}
+  {{ chart_counts|json_script:"counts-data" }}
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Only run if the data element exists (i.e., user is staff)
+        const userElement = document.getElementById('users-data');
+        if (!userElement) return;
+
+        const labels = JSON.parse(userElement.textContent);
+        const data = JSON.parse(document.getElementById('counts-data').textContent);
+
+        if (!labels || labels.length === 0) return;
+
+        const ctx = document.getElementById('adminChart');
+        if (ctx) {
+            new Chart(ctx, {
+                type: 'bar', // Bar chart is best for comparing categories (users)
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Total Quizzes Attempted',
+                        data: data,
+                        backgroundColor: 'rgba(32, 80, 160, 0.7)', // sq-primary
+                        borderColor: '#2050a0',
+                        borderWidth: 1,
+                        borderRadius: 4,
+                        barPercentage: 0.6
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: { stepSize: 1 },
+                            grid: { color: '#f0f2f5' }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+    });
+  </script>
 </body>
 </html>
